@@ -149,9 +149,11 @@ export LLM_MODEL='<你的模型 id>'
 
 - `--arxiv-max`
   - arXiv 抓取数量
+  - 默认：`0`
 
 - `--hf-max`
   - HuggingFace Papers 页面抓取前 N 条 arXiv id（用于 HOT 标记）
+  - 默认：`0`
 
 - `--openreview-max`
   - OpenReview 抓取数量（默认 0，不抓取）

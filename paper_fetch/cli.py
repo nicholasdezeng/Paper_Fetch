@@ -34,8 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--keyword", action="append", default=[], help="arXiv keyword query snippet, can be repeated")
     p.add_argument("--category", action="append", default=[], help="arXiv category like cs.CV, can be repeated")
 
-    p.add_argument("--arxiv-max", type=int, default=50, help="number of arXiv papers to fetch")
-    p.add_argument("--hf-max", type=int, default=30, help="number of HuggingFace daily papers ids to fetch (for HOT marking)")
+    p.add_argument("--arxiv-max", type=int, default=0, help="number of arXiv papers to fetch")
+    p.add_argument("--hf-max", type=int, default=0, help="number of HuggingFace daily papers ids to fetch (for HOT marking)")
     p.add_argument("--openreview-max", type=int, default=0, help="number of OpenReview notes to fetch")
     p.add_argument("--openreview-invitation", default="", help="OpenReview invitation id, e.g. <venue>/-/Submission")
 
@@ -166,7 +166,7 @@ def main(argv: List[str] | None = None) -> int:
         return 2
 
     hf_ids = set()
-    if not args.no_hf_trending:
+    if (int(args.hf_max) > 0) and (not args.no_hf_trending):
         try:
             hf_ids = fetch_hf_trending_arxiv_ids(max_items=args.hf_max)
         except Exception as e:

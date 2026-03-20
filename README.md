@@ -190,7 +190,7 @@ python -m paper_fetch --help
 
 - `--arxiv-max`
   - Number of arXiv papers to fetch.
-  - Default: `50`.
+  - Default: `0`.
 
 - `--keyword`
   - arXiv query snippet (passed into the arXiv query string).
@@ -236,7 +236,7 @@ python -m paper_fetch --help
 - `--hf-max`
   - How many HuggingFace Papers ids to fetch from https://huggingface.co/papers.
   - Used only for HOT marking for arXiv IDs.
-  - Default: `30`.
+  - Default: `0`.
 
 - `--no-hf-trending`
   - Disable HuggingFace HOT marking.
