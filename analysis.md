@@ -1,0 +1,89 @@
+# Paper Fetch Report (2026-03-20)
+
+## arXiv (20)
+
+- **2603.19235v1** [CODE] Generation Models Know Space: Unleashing Implicit 3D Priors for Scene Understanding
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19235v1
+  - abs: http://arxiv.org/abs/2603.19235v1
+  - code: https://github.com/H-EmbodVis/VEGA-3D
+- **2603.19232v1** [CODE] Cubic Discrete Diffusion: Discrete Visual Generation on High-Dimensional Representation Tokens
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19232v1
+  - abs: http://arxiv.org/abs/2603.19232v1
+  - code: https://github.com/YuqingWang1029/CubiD
+- **2603.19227v1** Bridging Semantic and Kinematic Conditions with Diffusion-based Discrete Motion Tokenizer
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19227v1
+  - abs: http://arxiv.org/abs/2603.19227v1
+- **2603.19226v1** Under One Sun: Multi-Object Generative Perception of Materials and Illumination
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19226v1
+  - abs: http://arxiv.org/abs/2603.19226v1
+- **2603.19224v1** EffectErase: Joint Video Object Removal and Insertion for High-Quality Effect Erasing
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19224v1
+  - abs: http://arxiv.org/abs/2603.19224v1
+- **2603.19222v1** Spectrally-Guided Diffusion Noise Schedules
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19222v1
+  - abs: http://arxiv.org/abs/2603.19222v1
+- **2603.19218v1** Rethinking Vector Field Learning for Generative Segmentation
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19218v1
+  - abs: http://arxiv.org/abs/2603.19218v1
+- **2603.19206v1** RPiAE: A Representation-Pivoted Autoencoder Enhancing Both Image Generation and Editing
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19206v1
+  - abs: http://arxiv.org/abs/2603.19206v1
+- **2603.19176v1** Few-shot Acoustic Synthesis with Multimodal Flow Matching
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19176v1
+  - abs: http://arxiv.org/abs/2603.19176v1
+- **2603.19173v1** SOL-ExecBench: Speed-of-Light Benchmarking for Real-World GPU Kernels Against Hardware Limits
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19173v1
+  - abs: http://arxiv.org/abs/2603.19173v1
+- **2603.19158v1** Adaptive Auxiliary Prompt Blending for Target-Faithful Diffusion Generation
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19158v1
+  - abs: http://arxiv.org/abs/2603.19158v1
+- **2603.19157v1** ADAPT: Attention Driven Adaptive Prompt Scheduling and InTerpolating Orthogonal Complements for Rare Concepts Generation
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19157v1
+  - abs: http://arxiv.org/abs/2603.19157v1
+- **2603.19146v1** D5P4: Partition Determinantal Point Process for Diversity in Parallel Discrete Diffusion Decoding
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19146v1
+  - abs: http://arxiv.org/abs/2603.19146v1
+- **2603.19122v1** Revisiting Autoregressive Models for Generative Image Classification
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19122v1
+  - abs: http://arxiv.org/abs/2603.19122v1
+- **2603.19100v1** [CODE] LuMamba: Latent Unified Mamba for Electrode Topology-Invariant and Efficient EEG Modeling
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19100v1
+  - abs: http://arxiv.org/abs/2603.19100v1
+  - code: https://github.com/pulp-bio/biofoundation
+- **2603.19036v1** [CODE] FUMO: Prior-Modulated Diffusion for Single Image Reflection Removal
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.19036v1
+  - abs: http://arxiv.org/abs/2603.19036v1
+  - code: https://github.com/Lucious-Desmon/FUMO
+- **2603.18992v1** Foundations of Schrödinger Bridges for Generative Modeling
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.18992v1
+  - abs: http://arxiv.org/abs/2603.18992v1
+- **2603.18991v1** CRAFT: Aligning Diffusion Models with Fine-Tuning Is Easier Than You Think
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.18991v1
+  - abs: http://arxiv.org/abs/2603.18991v1
+- **2603.18896v1** [CODE] Translating MRI to PET through Conditional Diffusion Models with Enhanced Pathology Awareness
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.18896v1
+  - abs: http://arxiv.org/abs/2603.18896v1
+  - code: https://github.com/ai-med/PASTA
+- **2603.18806v1** dTRPO: Trajectory Reduction in Policy Optimization of Diffusion Large Language Models
+  - published: 2026-03-19
+  - pdf: https://arxiv.org/pdf/2603.18806v1
+  - abs: http://arxiv.org/abs/2603.18806v1

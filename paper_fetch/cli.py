@@ -1,0 +1,295 @@
+from __future__ import annotations
+
+import argparse
+import datetime
+import json
+import sys
+import time
+from pathlib import Path
+from typing import List
+
+from tqdm import tqdm
+
+from .arxiv_client import search_arxiv
+from .hf_trending import fetch_hf_trending_arxiv_ids
+from .llm_client import LLMConfigError, chat_completion, load_llm_config
+from .openreview_client import fetch_openreview_notes, notes_to_records
+from .report import render_basic_report, write_report
+from .storage import download_pdf, paper_dir, save_metadata_json
+
+
+def _parse_list(values: List[str]) -> List[str]:
+    out: List[str] = []
+    for v in values:
+        v = v.strip()
+        if not v:
+            continue
+        out.append(v)
+    return out
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="paper-fetch")
+    p.add_argument("--out", required=True, help="output directory")
+    p.add_argument("--keyword", action="append", default=[], help="arXiv keyword query snippet, can be repeated")
+    p.add_argument("--category", action="append", default=[], help="arXiv category like cs.CV, can be repeated")
+
+    p.add_argument("--arxiv-max", type=int, default=50, help="number of arXiv papers to fetch")
+    p.add_argument("--hf-max", type=int, default=30, help="number of HuggingFace daily papers ids to fetch (for HOT marking)")
+    p.add_argument("--openreview-max", type=int, default=0, help="number of OpenReview notes to fetch")
+    p.add_argument("--openreview-invitation", default="", help="OpenReview invitation id, e.g. <venue>/-/Submission")
+
+    p.add_argument("--no-hf-trending", action="store_true", help="disable HuggingFace trending marking")
+    p.add_argument("--no-pdf", action="store_true", help="only save metadata.json (no PDF download)")
+
+    p.add_argument(
+        "--allow-empty-arxiv-query",
+        action="store_true",
+        help="allow running arXiv fetch with no --keyword and no --category",
+    )
+
+    p.add_argument("--enable-llm", action="store_true", help="enable LLM analysis and write analysis.md")
+    p.add_argument("--analysis-out", default="analysis.md", help="markdown report output path (default: ./analysis.md)")
+    p.add_argument(
+        "--llm-instruction",
+        default="",
+        help="LLM analysis instruction text. If empty and --enable-llm is set, will prompt interactively in terminal.",
+    )
+    p.add_argument(
+        "--llm-no-interactive",
+        action="store_true",
+        help="do not prompt for LLM instruction (use default instruction if --llm-instruction is empty)",
+    )
+    p.add_argument(
+        "--llm-max-papers",
+        type=int,
+        default=30,
+        help="max number of local metadata.json entries to include in LLM prompt",
+    )
+    return p
+
+
+def _today_dirname() -> str:
+    return datetime.date.today().strftime("%Y-%m-%d")
+
+
+def _ensure_source_dirs(base_out: Path) -> dict[str, Path]:
+    day_dir = base_out / _today_dirname()
+    d = {
+        "arxiv": day_dir / "_arXiv",
+        "hf": day_dir / "_Huggingface",
+        "openreview": day_dir / "_OpenReview",
+    }
+    for p in d.values():
+        p.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _read_llm_instruction_interactive() -> str:
+    print("\nEnter LLM analysis instructions. End with an empty line (or Ctrl-D).", file=sys.stderr)
+    lines: list[str] = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        if line.strip() == "":
+            break
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def _iter_metadata_json_files(root: Path) -> List[Path]:
+    if not root.exists():
+        return []
+    return sorted(root.rglob("metadata.json"))
+
+
+def _build_llm_metadata_digest(paths: List[Path], max_papers: int) -> str:
+    lines: list[str] = []
+    count = 0
+    for p in paths:
+        if max_papers > 0 and count >= max_papers:
+            break
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+
+        title = str(data.get("title", ""))
+        paper_id = str(data.get("paper_id", ""))
+        source = str(data.get("source", ""))
+        published = str(data.get("published", ""))
+        primary_category = str(data.get("primary_category", ""))
+        github_url = data.get("github_url")
+        authors = data.get("authors") or []
+        if not isinstance(authors, list):
+            authors = []
+        author_str = ", ".join([str(a) for a in authors[:10]])
+        summary = str(data.get("summary", ""))
+        summary = " ".join(summary.split())
+        if len(summary) > 500:
+            summary = summary[:500] + "..."
+
+        lines.append(f"- source: {source}")
+        lines.append(f"  id: {paper_id}")
+        lines.append(f"  title: {title}")
+        if author_str:
+            lines.append(f"  authors: {author_str}")
+        if published:
+            lines.append(f"  published: {published}")
+        if primary_category and primary_category != "None":
+            lines.append(f"  category: {primary_category}")
+        if github_url:
+            lines.append(f"  github: {github_url}")
+        if summary:
+            lines.append(f"  summary: {summary}")
+        lines.append("")
+        count += 1
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def main(argv: List[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    base_out_dir = Path(args.out).expanduser().resolve()
+    src_dirs = _ensure_source_dirs(base_out_dir)
+    keywords = _parse_list(args.keyword)
+    categories = _parse_list(args.category)
+
+    if int(args.arxiv_max) > 0 and not keywords and not categories and not args.allow_empty_arxiv_query:
+        print(
+            "[WARN] Refuse to run arXiv fetch with empty query. Provide --keyword/--category, or pass --allow-empty-arxiv-query.",
+            file=sys.stderr,
+        )
+        return 2
+
+    hf_ids = set()
+    if not args.no_hf_trending:
+        try:
+            hf_ids = fetch_hf_trending_arxiv_ids(max_items=args.hf_max)
+        except Exception as e:
+            print(f"[HUGGINGFACE_ERROR] {e}", file=sys.stderr)
+            hf_ids = set()
+
+    try:
+        (src_dirs["hf"] / "trending_arxiv_ids.txt").write_text(
+            "\n".join(sorted(hf_ids)),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+    arxiv_records = []
+    openreview_records = []
+
+    arxiv_total = max(0, int(args.arxiv_max))
+    arxiv_meta_start = time.time()
+    with tqdm(total=arxiv_total, desc="arXiv meta", unit="paper", disable=(arxiv_total == 0)) as pbar:
+        for rec in search_arxiv(
+            keywords=keywords,
+            categories=categories,
+            max_results=args.arxiv_max,
+            hf_trending_ids=hf_ids,
+        ):
+            pbar.update(1)
+            d = paper_dir(src_dirs["arxiv"], rec.paper_id, rec.title)
+            save_metadata_json(d, rec)
+            arxiv_records.append(rec)
+
+            hot = "HOT" if rec.is_hf_trending else ""
+            code = "CODE" if rec.github_url else ""
+            tail = " ".join([x for x in [hot, code] if x])
+            if tail:
+                tail = " [" + tail + "]"
+            print(f"{rec.paper_id}{tail} {rec.title}")
+
+    if arxiv_total > 0:
+        arxiv_meta_elapsed = max(0.0, time.time() - arxiv_meta_start)
+        print(f"[INFO] arXiv metadata done: {len(arxiv_records)}/{arxiv_total} elapsed={arxiv_meta_elapsed:0.1f}s", file=sys.stderr)
+        if len(arxiv_records) == 0:
+            print(
+                "[WARN] arXiv returned 0 results for the given --keyword/--category. Stop.",
+                file=sys.stderr,
+            )
+            return 2
+
+    if arxiv_records and (not args.no_pdf):
+        pdf_start = time.time()
+        pdf_total = len(arxiv_records)
+        for rec in tqdm(arxiv_records, total=pdf_total, desc="PDF", unit="paper"):
+            d = paper_dir(src_dirs["arxiv"], rec.paper_id, rec.title)
+            try:
+                download_pdf(d, rec)
+            except Exception as e:
+                print(f"{rec.paper_id} [PDF_ERROR] {e}")
+        pdf_elapsed = max(0.0, time.time() - pdf_start)
+        print(f"[INFO] PDF download done: {pdf_total} elapsed={pdf_elapsed:0.1f}s", file=sys.stderr)
+
+    if args.openreview_max and args.openreview_invitation:
+        try:
+            notes = fetch_openreview_notes(
+                invitation=args.openreview_invitation,
+                max_results=args.openreview_max,
+            )
+            or_start = time.time()
+            or_total = len(notes)
+            for rec in tqdm(
+                list(notes_to_records(notes, invitation=args.openreview_invitation)),
+                total=max(1, or_total),
+                desc="OpenReview",
+                unit="paper",
+            ):
+                d = paper_dir(src_dirs["openreview"], rec.paper_id, rec.title)
+                save_metadata_json(d, rec)
+                openreview_records.append(rec)
+                print(f"{rec.paper_id} {rec.title}")
+            or_elapsed = max(0.0, time.time() - or_start)
+            print(f"[INFO] OpenReview done: {len(openreview_records)}/{max(1, int(args.openreview_max))} elapsed={or_elapsed:0.1f}s", file=sys.stderr)
+        except Exception as e:
+            print(f"[OPENREVIEW_ERROR] {e}")
+
+    if args.enable_llm:
+        report_path = Path(args.analysis_out).expanduser().resolve()
+        md = render_basic_report(arxiv_records=arxiv_records, openreview_records=openreview_records)
+
+        default_instruction = (
+            "Write a concise research digest for the fetched papers. "
+            "Include: key themes, 5 papers to read first with reasons, and 3 potential research ideas."
+        )
+
+        instruction = (args.llm_instruction or "").strip()
+        if not instruction and (not args.llm_no_interactive) and sys.stdin.isatty():
+            instruction = _read_llm_instruction_interactive()
+        if not instruction:
+            instruction = default_instruction
+
+        meta_paths: List[Path] = []
+        meta_paths.extend(_iter_metadata_json_files(src_dirs["arxiv"]))
+        meta_paths.extend(_iter_metadata_json_files(src_dirs["openreview"]))
+        digest = _build_llm_metadata_digest(meta_paths, int(args.llm_max_papers))
+
+        try:
+            base_url, api_key, model = load_llm_config()
+            prompt = (
+                instruction.strip()
+                + "\n\n"
+                + "IMPORTANT: Analyze ONLY the local metadata below (extracted from metadata.json). Do NOT assume you read PDFs.\n\n"
+                + "Local metadata digest:\n\n"
+                + digest
+                + "\n\n"
+                + "Also keep the response concise."
+            )
+            analysis = chat_completion(base_url=base_url, api_key=api_key, model=model, prompt=prompt)
+            md = md + "\n## LLM Analysis\n\n" + analysis.strip() + "\n"
+            write_report(report_path, md)
+            print(f"[INFO] analysis written: {report_path}", file=sys.stderr)
+        except LLMConfigError as e:
+            print(f"[LLM_CONFIG_ERROR] {e}", file=sys.stderr)
+            return 2
+        except Exception as e:
+            print(f"[LLM_ERROR] {e}", file=sys.stderr)
+            return 2
+
+    return 0
