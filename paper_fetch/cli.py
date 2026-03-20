@@ -186,25 +186,26 @@ def main(argv: List[str] | None = None) -> int:
     openreview_records = []
 
     arxiv_total = max(0, int(args.arxiv_max))
-    arxiv_meta_start = time.time()
-    with tqdm(total=arxiv_total, desc="arXiv meta", unit="paper", disable=(arxiv_total == 0)) as pbar:
-        for rec in search_arxiv(
-            keywords=keywords,
-            categories=categories,
-            max_results=args.arxiv_max,
-            hf_trending_ids=hf_ids,
-        ):
-            pbar.update(1)
-            d = paper_dir(src_dirs["arxiv"], rec.paper_id)
-            save_metadata_json(d, rec)
-            arxiv_records.append(rec)
+    if arxiv_total > 0:
+        arxiv_meta_start = time.time()
+        with tqdm(total=arxiv_total, desc="arXiv meta", unit="paper") as pbar:
+            for rec in search_arxiv(
+                keywords=keywords,
+                categories=categories,
+                max_results=args.arxiv_max,
+                hf_trending_ids=hf_ids,
+            ):
+                pbar.update(1)
+                d = paper_dir(src_dirs["arxiv"], rec.paper_id)
+                save_metadata_json(d, rec)
+                arxiv_records.append(rec)
 
-            hot = "HOT" if rec.is_hf_trending else ""
-            code = "CODE" if rec.github_url else ""
-            tail = " ".join([x for x in [hot, code] if x])
-            if tail:
-                tail = " [" + tail + "]"
-            print(f"{rec.paper_id}{tail} {rec.title}")
+                hot = "HOT" if rec.is_hf_trending else ""
+                code = "CODE" if rec.github_url else ""
+                tail = " ".join([x for x in [hot, code] if x])
+                if tail:
+                    tail = " [" + tail + "]"
+                print(f"{rec.paper_id}{tail} {rec.title}")
 
     if arxiv_total > 0:
         arxiv_meta_elapsed = max(0.0, time.time() - arxiv_meta_start)

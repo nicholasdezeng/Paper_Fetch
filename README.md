@@ -6,6 +6,11 @@ A minimal paper fetching & saving tool for:
 - OpenReview notes fetching by invitation (conference/journal configurable)
 - Optional LLM analysis (OpenAI-compatible API)
 
+NOTE:
+
+- OpenReview support is not fully stable yet.
+- LLM features are still in testing.
+
 English | [中文](#中文说明) | [完整中文文档](./README_zh.md)
 
 ## Quick Start

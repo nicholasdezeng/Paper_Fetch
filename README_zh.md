@@ -7,6 +7,11 @@
 - OpenReview：按 `invitation` 抓取指定会议/期刊/Workshop 的 notes 元数据
 - 可选 LLM 分析：兼容 OpenAI 接口风格（默认不启用），生成 `analysis.md`
 
+注意：
+
+- OpenReview 暂不支持完整功能。
+- LLM 功能仍在测试中。
+
 ## 快速开始
 
 ### 1）安装依赖
