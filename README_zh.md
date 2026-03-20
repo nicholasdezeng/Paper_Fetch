@@ -24,7 +24,7 @@ python -m paper_fetch \
   --out ./papers \
   --arxiv-max 20 \
   --hf-max 30 \
-  --keyword '"Diffusion"' \
+  --keyword '"<你的关键词>"' \
   --category cs.CV \
   --category cs.LG
 ```
@@ -49,7 +49,7 @@ OpenReview 是“按会议/期刊 invitation”抓取，示例：
 python -m paper_fetch \
   --out ./papers \
   --openreview-max 200 \
-  --openreview-invitation 'ICLR.cc/2025/Conference/-/Submission' \
+  --openreview-invitation '<OpenReview invitation id>' \
   --no-pdf
 ```
 
@@ -67,17 +67,17 @@ python -m paper_fetch \
 
 常用写法示例：
 
-```bash
+```text
 # 直接短语
 --keyword '"large language model"'
 
 # 指定字段：ti=标题 abs=摘要 au=作者
---keyword 'ti:"diffusion"'
+--keyword 'ti:"transformer"'
 --keyword 'abs:"reinforcement learning"'
 --keyword 'au:"Yann LeCun"'
 
 # 布尔组合
---keyword '(ti:"diffusion" AND abs:"segmentation")'
+--keyword '(ti:"transformer" AND abs:"efficient")'
 ```
 
 本工具的拼接规则：
@@ -124,7 +124,7 @@ python -m paper_fetch \
   --arxiv-max 20 \
   --enable-llm \
   --llm-no-interactive \
-  --llm-instruction '请先按主题归类，然后给出最值得精读的 5 篇，并解释原因。' \
+  --llm-instruction '<你的分析指令>' \
   --llm-max-papers 30
 ```
 
@@ -133,8 +133,14 @@ python -m paper_fetch \
 ```bash
 export LLM_BASE_URL='https://api.openai.com/v1'
 export LLM_API_KEY='YOUR_API_KEY'
-export LLM_MODEL='gpt-4o-mini'
+export LLM_MODEL='<你的模型 id>'
 ```
+
+支持/可用的模型：
+
+- 本项目会把 `LLM_MODEL` 原样传给 `LLM_BASE_URL` 对应的 OpenAI 兼容接口。
+- 因此你可以使用你的服务端实际提供的任意模型 id。
+- 示例（取决于服务端/平台）：`gpt-4o-mini`、`gpt-4o`、`gpt-4.1-mini`。
 
 ## 常用参数速查
 
