@@ -34,6 +34,8 @@ python -m paper_fetch \
 - `./papers/<YYYY-MM-DD>/_arXiv/<论文标题>/metadata.json`
 - `./papers/<YYYY-MM-DD>/_arXiv/<论文标题>/<paper_id> - <title>.pdf`（仅 arXiv，且未开启 `--no-pdf` 时才会下载）
 - `./papers/<YYYY-MM-DD>/_Huggingface/trending_arxiv_ids.txt`
+- `./papers/<YYYY-MM-DD>/_Huggingface/<paper_id>/metadata.json`
+- `./papers/<YYYY-MM-DD>/_Huggingface/<paper_id>/<paper_id> - <title>.pdf`（未开启 `--no-pdf` 时才会下载）
 - `./papers/<YYYY-MM-DD>/_OpenReview/<论文标题>/metadata.json`
 
 目录命名说明：
@@ -44,6 +46,21 @@ python -m paper_fetch \
 ### 3）OpenReview 抓取
 
 OpenReview 是“按会议/期刊 invitation”抓取，示例：
+
+如何找到 `invitation id`（通用方法）：
+
+- 打开 https://openreview.net
+- 进入你要抓取的 venue/group 页面
+- 在页面里找到“投稿/Submission”对应的 invitation（通常包含 `/-/Submission` 或类似形式）
+- 把完整的 invitation 字符串填到 `--openreview-invitation`
+
+invitation 形式示例（仅参考，不是一键命令）：
+
+```text
+<VenueID>/<Year>/<Track>/-/Submission
+<VenueID>/<Year>/<Track>/-/Blind_Submission
+<VenueID>/<Year>/<Track>/-/Paper
+```
 
 ```bash
 python -m paper_fetch \

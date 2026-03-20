@@ -10,6 +10,7 @@ from .models import PaperRecord
 def render_basic_report(
     *,
     arxiv_records: Sequence[PaperRecord],
+    hf_records: Sequence[PaperRecord],
     openreview_records: Sequence[PaperRecord],
 ) -> str:
     today = datetime.date.today().isoformat()
@@ -43,6 +44,22 @@ def render_basic_report(
             lines.append(f"- **{r.paper_id}** {r.title}")
             if r.abs_url:
                 lines.append(f"  - url: {r.abs_url}")
+        lines.append("")
+
+    if hf_records:
+        lines.append(f"## HuggingFace Papers ({len(hf_records)})")
+        lines.append("")
+        for r in hf_records:
+            tags: List[str] = []
+            if r.github_url:
+                tags.append("CODE")
+            tag = f" [{' '.join(tags)}]" if tags else ""
+            lines.append(f"- **{r.paper_id}**{tag} {r.title}")
+            lines.append(f"  - published: {r.published}")
+            lines.append(f"  - pdf: {r.pdf_url}")
+            lines.append(f"  - abs: {r.abs_url}")
+            if r.github_url:
+                lines.append(f"  - code: {r.github_url}")
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"

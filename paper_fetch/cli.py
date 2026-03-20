@@ -10,7 +10,7 @@ from typing import List
 
 from tqdm import tqdm
 
-from .arxiv_client import search_arxiv
+from .arxiv_client import fetch_arxiv_by_ids, search_arxiv
 from .hf_trending import fetch_hf_trending_arxiv_ids
 from .llm_client import LLMConfigError, chat_completion, load_llm_config
 from .openreview_client import fetch_openreview_notes, notes_to_records
@@ -182,6 +182,7 @@ def main(argv: List[str] | None = None) -> int:
         pass
 
     arxiv_records = []
+    hf_records = []
     openreview_records = []
 
     arxiv_total = max(0, int(args.arxiv_max))
@@ -194,7 +195,7 @@ def main(argv: List[str] | None = None) -> int:
             hf_trending_ids=hf_ids,
         ):
             pbar.update(1)
-            d = paper_dir(src_dirs["arxiv"], rec.paper_id, rec.title)
+            d = paper_dir(src_dirs["arxiv"], rec.paper_id)
             save_metadata_json(d, rec)
             arxiv_records.append(rec)
 
@@ -219,13 +220,42 @@ def main(argv: List[str] | None = None) -> int:
         pdf_start = time.time()
         pdf_total = len(arxiv_records)
         for rec in tqdm(arxiv_records, total=pdf_total, desc="PDF", unit="paper"):
-            d = paper_dir(src_dirs["arxiv"], rec.paper_id, rec.title)
+            d = paper_dir(src_dirs["arxiv"], rec.paper_id)
             try:
                 download_pdf(d, rec)
             except Exception as e:
                 print(f"{rec.paper_id} [PDF_ERROR] {e}")
         pdf_elapsed = max(0.0, time.time() - pdf_start)
         print(f"[INFO] PDF download done: {pdf_total} elapsed={pdf_elapsed:0.1f}s", file=sys.stderr)
+
+    if int(args.hf_max) > 0:
+        hf_total = len(hf_ids)
+        hf_meta_start = time.time()
+        with tqdm(total=hf_total, desc="HF meta", unit="paper", disable=(hf_total == 0)) as pbar:
+            for rec in fetch_arxiv_by_ids(paper_ids=sorted(hf_ids), source="hf", is_hf_trending=True):
+                pbar.update(1)
+                d = paper_dir(src_dirs["hf"], rec.paper_id)
+                save_metadata_json(d, rec)
+                hf_records.append(rec)
+                code = "CODE" if rec.github_url else ""
+                tail = f" [{code}]" if code else ""
+                print(f"{rec.paper_id}{tail} {rec.title}")
+
+        if hf_total > 0:
+            hf_meta_elapsed = max(0.0, time.time() - hf_meta_start)
+            print(f"[INFO] HF metadata done: {len(hf_records)}/{hf_total} elapsed={hf_meta_elapsed:0.1f}s", file=sys.stderr)
+
+        if hf_records and (not args.no_pdf):
+            hf_pdf_start = time.time()
+            hf_pdf_total = len(hf_records)
+            for rec in tqdm(hf_records, total=hf_pdf_total, desc="HF PDF", unit="paper"):
+                d = paper_dir(src_dirs["hf"], rec.paper_id)
+                try:
+                    download_pdf(d, rec)
+                except Exception as e:
+                    print(f"{rec.paper_id} [HF_PDF_ERROR] {e}")
+            hf_pdf_elapsed = max(0.0, time.time() - hf_pdf_start)
+            print(f"[INFO] HF PDF download done: {hf_pdf_total} elapsed={hf_pdf_elapsed:0.1f}s", file=sys.stderr)
 
     if args.openreview_max and args.openreview_invitation:
         try:
@@ -241,7 +271,7 @@ def main(argv: List[str] | None = None) -> int:
                 desc="OpenReview",
                 unit="paper",
             ):
-                d = paper_dir(src_dirs["openreview"], rec.paper_id, rec.title)
+                d = paper_dir(src_dirs["openreview"], rec.paper_id)
                 save_metadata_json(d, rec)
                 openreview_records.append(rec)
                 print(f"{rec.paper_id} {rec.title}")
@@ -252,7 +282,7 @@ def main(argv: List[str] | None = None) -> int:
 
     if args.enable_llm:
         report_path = Path(args.analysis_out).expanduser().resolve()
-        md = render_basic_report(arxiv_records=arxiv_records, openreview_records=openreview_records)
+        md = render_basic_report(arxiv_records=arxiv_records, hf_records=hf_records, openreview_records=openreview_records)
 
         default_instruction = (
             "Write a concise research digest for the fetched papers. "
@@ -267,6 +297,7 @@ def main(argv: List[str] | None = None) -> int:
 
         meta_paths: List[Path] = []
         meta_paths.extend(_iter_metadata_json_files(src_dirs["arxiv"]))
+        meta_paths.extend(_iter_metadata_json_files(src_dirs["hf"]))
         meta_paths.extend(_iter_metadata_json_files(src_dirs["openreview"]))
         digest = _build_llm_metadata_digest(meta_paths, int(args.llm_max_papers))
 

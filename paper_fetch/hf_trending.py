@@ -21,6 +21,8 @@ def fetch_hf_trending_arxiv_ids(max_items: int | None = None, timeout_s: int = 2
         if not href:
             continue
         pid = href.split("/")[-1]
+        pid = pid.split("#", 1)[0]
+        pid = pid.split("?", 1)[0]
         if pid in seen:
             continue
         seen.add(pid)

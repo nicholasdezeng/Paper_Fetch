@@ -48,3 +48,37 @@ def search_arxiv(
             github_url=github_links[0] if github_links else None,
             is_hf_trending=paper_id in trending,
         )
+
+
+def fetch_arxiv_by_ids(
+    *,
+    paper_ids: Sequence[str],
+    source: str,
+    is_hf_trending: bool = False,
+) -> Iterable[PaperRecord]:
+    """Fetch arXiv metadata by explicit arXiv ids.
+
+    This is used to turn external arXiv-id lists (e.g. HuggingFace Papers trending)
+    into local saved records.
+    """
+
+    for pid in paper_ids:
+        search = arxiv.Search(id_list=[pid], max_results=1)
+        for res in search.results():
+            paper_id = res.entry_id.split("/")[-1]
+            github_links = re.findall(r"https?://github\.com/[\w/-]+", res.summary or "")
+            authors = [a.name for a in (res.authors or [])]
+
+            yield PaperRecord(
+                source=source,
+                paper_id=paper_id,
+                title=res.title or "",
+                authors=authors,
+                summary=res.summary or "",
+                published=res.published.strftime("%Y-%m-%d") if res.published else "",
+                abs_url=res.entry_id,
+                pdf_url=res.pdf_url,
+                primary_category=getattr(res, "primary_category", None),
+                github_url=github_links[0] if github_links else None,
+                is_hf_trending=is_hf_trending,
+            )
