@@ -2,7 +2,7 @@
 
 本项目是一个轻量的论文抓取与本地保存工具，支持：
 
-- arXiv：按关键词/分类检索论文，保存 `metadata.json`，并可选下载 PDF
+- arXiv：按关键词/分类检索论文，保存元数据（每篇论文一个 `<paper_id>.json`），并可选下载 PDF
 - HuggingFace Papers：抓取每日论文页面的 arXiv id，用于 HOT 标记（并落盘保存）
 - OpenReview：按 `invitation` 抓取指定会议/期刊/Workshop 的 notes 元数据
 - 可选 LLM 分析：兼容 OpenAI 接口风格（默认不启用），生成 `analysis.md`
@@ -27,6 +27,7 @@ python -m pip install -r requirements.txt
 ```bash
 python -m paper_fetch \
   --out ./papers \
+  --collection '<你的 collection>' \
   --arxiv-max 20 \
   --keyword '"<你的关键词>"' \
   --category cs.CV \
@@ -43,6 +44,7 @@ python -m paper_fetch \
 ```bash
 python -m paper_fetch \
   --out ./papers \
+  --collection '<你的 collection>' \
   --hf-max 30
 ```
 
@@ -55,6 +57,7 @@ python -m paper_fetch \
 ```bash
 python -m paper_fetch \
   --out ./papers \
+  --collection '<你的 collection>' \
   --hf-search '<你的查询>' \
   --hf-search-max 30
 ```
@@ -64,20 +67,36 @@ python -m paper_fetch \
 - `--hf-search`：HuggingFace Papers 的搜索查询（用于 https://huggingface.co/papers?q=... 的纯文本查询；不是 arXiv 查询语法）。
 - `--hf-search-max`：HuggingFace Papers 搜索结果抓取总数上限。
 
-输出目录结构（每次运行会自动创建当天日期文件夹）：
+说明：
 
-- `./papers/<YYYY-MM-DD>/_arXiv/<论文标题>/metadata.json`
-- `./papers/<YYYY-MM-DD>/_arXiv/<论文标题>/<paper_id> - <title>.pdf`（仅 arXiv，且未开启 `--no-pdf` 时才会下载）
-- `./papers/<YYYY-MM-DD>/_Huggingface/trending_arxiv_ids.txt`
-- `./papers/<YYYY-MM-DD>/_Huggingface/search_arxiv_ids.txt`
-- `./papers/<YYYY-MM-DD>/_Huggingface/<paper_id>/metadata.json`
-- `./papers/<YYYY-MM-DD>/_Huggingface/<paper_id>/<paper_id> - <title>.pdf`（未开启 `--no-pdf` 时才会下载）
-- `./papers/<YYYY-MM-DD>/_OpenReview/<论文标题>/metadata.json`
+- `--hf-search` 是对 HuggingFace Papers 搜索页面的尽力抓取（匹配规则由 HuggingFace 决定，可能变化）。
+- 用人名做查询不保证等价于“精确按作者过滤”。
+- 如果你需要精确按作者检索，建议使用 arXiv 的查询语法（`--keyword`），例如：
+
+  ```text
+  --keyword 'au:"<作者名>"'
+  ```
+
+输出目录结构（以 collection 为外层；按年份归档；不再创建日期文件夹；不再“一篇一个文件夹”）：
+
+- `./papers/<collection>/index.jsonl`
+- `./papers/<collection>/index.csv`
+
+- `./papers/<collection>/_arXiv/<YYYY>/<paper_id>.json`
+- `./papers/<collection>/_arXiv/<YYYY>/<paper_id>.pdf`（未开启 `--no-pdf` 时才会下载）
+
+- `./papers/<collection>/_Huggingface/trending_arxiv_ids.txt`
+- `./papers/<collection>/_Huggingface/search_arxiv_ids.txt`
+- `./papers/<collection>/_Huggingface/<YYYY>/<paper_id>.json`
+- `./papers/<collection>/_Huggingface/<YYYY>/<paper_id>.pdf`（未开启 `--no-pdf` 时才会下载）
+
+- `./papers/<collection>/_OpenReview/<YYYY>/<paper_id>.json`
 
 目录命名说明：
 
 - 按数据源分目录：`_arXiv` / `_Huggingface` / `_OpenReview`
-- 每篇论文用“论文标题”创建子目录；若出现重名冲突，会自动在目录名后追加论文 id
+- 在每个数据源目录下按年份归档：`<YYYY>/...`
+- 单篇论文不再创建子目录；PDF 与元数据采用平铺文件：`<paper_id>.pdf` / `<paper_id>.json`
 
 ### 5）OpenReview 抓取
 
@@ -101,6 +120,7 @@ invitation 形式示例（仅参考，不是一键命令）：
 ```bash
 python -m paper_fetch \
   --out ./papers \
+  --collection '<你的 collection>' \
   --openreview-max 200 \
   --openreview-invitation '<OpenReview invitation id>' \
   --no-pdf
@@ -108,7 +128,7 @@ python -m paper_fetch \
 
 说明：
 
-- 由于 OpenReview 的 PDF 链接结构不统一，本实现默认只保存 `metadata.json`，建议加 `--no-pdf`
+- 由于 OpenReview 的 PDF 链接结构不统一，本实现默认只保存元数据（每篇论文一个 `<paper_id>.json`），建议加 `--no-pdf`
 
 ### 6）可选：启用 LLM 分析（默认不使用）
 
@@ -121,6 +141,7 @@ python -m paper_fetch \
 ```bash
 python -m paper_fetch \
   --out ./papers \
+  --collection '<你的 collection>' \
   --arxiv-max 20 \
   --enable-llm
 ```
@@ -130,6 +151,7 @@ python -m paper_fetch \
 ```bash
 python -m paper_fetch \
   --out ./papers \
+  --collection '<你的 collection>' \
   --arxiv-max 20 \
   --enable-llm \
   --llm-no-interactive \
@@ -192,7 +214,7 @@ python -m paper_fetch \
 
 LLM 分析说明（省 token 的关键点）：
 
-- LLM 只分析本地落盘的 `metadata.json`（标题/作者/摘要等），**不会读取 PDF**
+- LLM 只分析本地落盘的论文元数据 JSON（标题/作者/摘要等），**不会读取 PDF**
 - LLM 会在抓取完成并保存到本地后再执行分析
 - 你可以在终端交互输入“如何分析”（多行输入，空行结束）；也可以用参数非交互指定
 
@@ -269,7 +291,7 @@ python -m paper_fetch \
   - OpenReview invitation（决定抓哪个会议/期刊/轨道）
 
 - `--no-pdf`
-  - 不下载 PDF，仅保存 `metadata.json`
+  - 不下载 PDF，仅保存元数据（每篇论文对应一个 `<paper_id>.json`）
 
 - `--enable-llm`
   - 启用 LLM 分析并生成 `analysis.md`

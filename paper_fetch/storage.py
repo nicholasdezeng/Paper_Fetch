@@ -24,9 +24,17 @@ def paper_dir(base_dir: Path, paper_id: str) -> Path:
     return base_dir / paper_id
 
 
+def record_dir(base_dir: Path, record: PaperRecord) -> Path:
+    year = "unknown"
+    p = (record.published or "").strip()
+    if len(p) >= 4 and p[:4].isdigit():
+        year = p[:4]
+    return base_dir / year
+
+
 def save_metadata_json(target_dir: Path, record: PaperRecord) -> Path:
     target_dir.mkdir(parents=True, exist_ok=True)
-    path = target_dir / "metadata.json"
+    path = target_dir / f"{record.paper_id}.json"
     payload: Dict[str, object] = {
         "source": record.source,
         "paper_id": record.paper_id,
@@ -52,7 +60,7 @@ def download_pdf(
     backoff_s: float = 1.0,
 ) -> Path:
     target_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{record.paper_id} - {_safe_filename(record.title)}.pdf"
+    filename = f"{record.paper_id}.pdf"
     pdf_path = target_dir / filename
 
     if not record.pdf_url:

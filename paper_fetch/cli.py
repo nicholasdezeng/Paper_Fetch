@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import datetime
+import csv
 import json
 import random
 import sys
@@ -17,7 +17,7 @@ from .hf_trending import fetch_hf_search_arxiv_ids, fetch_hf_trending_arxiv_ids
 from .llm_client import LLMConfigError, chat_completion, load_llm_config
 from .openreview_client import fetch_openreview_notes, notes_to_records
 from .report import render_basic_report, write_report
-from .storage import download_pdf, paper_dir, save_metadata_json
+from .storage import download_pdf, record_dir, save_metadata_json
 
 def _sleep_pdf_throttle(*, backoff_multiplier: float) -> None:
     s = random.uniform(1.5, 3.0) * max(1.0, backoff_multiplier)
@@ -37,6 +37,7 @@ def _parse_list(values: List[str]) -> List[str]:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="paper-fetch")
     p.add_argument("--out", required=True, help="output directory")
+    p.add_argument("--collection", default="", help="outer collection folder name under --out")
     p.add_argument("--keyword", action="append", default=[], help="arXiv keyword query snippet, can be repeated")
     p.add_argument("--category", action="append", default=[], help="arXiv category like cs.CV, can be repeated")
 
@@ -53,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--openreview-invitation", default="", help="OpenReview invitation id, e.g. <venue>/-/Submission")
 
     p.add_argument("--no-hf-trending", action="store_true", help="disable HuggingFace trending marking")
-    p.add_argument("--no-pdf", action="store_true", help="only save metadata.json (no PDF download)")
+    p.add_argument("--no-pdf", action="store_true", help="do not download PDFs (save metadata only)")
 
     p.add_argument(
         "--allow-empty-arxiv-query",
@@ -77,25 +78,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--llm-max-papers",
         type=int,
         default=30,
-        help="max number of local metadata.json entries to include in LLM prompt",
+        help="max number of local paper JSON metadata entries to include in LLM prompt",
     )
     return p
 
 
-def _today_dirname() -> str:
-    return datetime.date.today().strftime("%Y-%m-%d")
-
-
-def _ensure_source_dirs(base_out: Path) -> dict[str, Path]:
-    day_dir = base_out / _today_dirname()
+def _ensure_source_dirs(base_out: Path, collection: str) -> tuple[Path, dict[str, Path]]:
+    root = base_out / collection
     d = {
-        "arxiv": day_dir / "_arXiv",
-        "hf": day_dir / "_Huggingface",
-        "openreview": day_dir / "_OpenReview",
+        "arxiv": root / "_arXiv",
+        "hf": root / "_Huggingface",
+        "openreview": root / "_OpenReview",
     }
+    root.mkdir(parents=True, exist_ok=True)
     for p in d.values():
         p.mkdir(parents=True, exist_ok=True)
-    return d
+    return root, d
 
 
 def _read_llm_instruction_interactive() -> str:
@@ -115,7 +113,82 @@ def _read_llm_instruction_interactive() -> str:
 def _iter_metadata_json_files(root: Path) -> List[Path]:
     if not root.exists():
         return []
-    return sorted(root.rglob("metadata.json"))
+    paths = sorted(root.rglob("*.json"))
+    out: List[Path] = []
+    for p in paths:
+        if p.name in ("index.json", "index.csv", "index.jsonl"):
+            continue
+        out.append(p)
+    return out
+
+
+def _write_index_files(root: Path, records: list[object]) -> None:
+    jsonl_path = root / "index.jsonl"
+    csv_path = root / "index.csv"
+
+    source_dir = {
+        "arxiv": root / "_arXiv",
+        "hf": root / "_Huggingface",
+        "openreview": root / "_OpenReview",
+    }
+
+    rows: list[dict[str, object]] = []
+    for rec in records:
+        if not hasattr(rec, "paper_id"):
+            continue
+        r = rec  # PaperRecord
+        src = str(getattr(r, "source", ""))
+        base = source_dir.get(src)
+        if base is None:
+            base = root / f"_{src}"
+
+        ydir = record_dir(base, r)
+        local_pdf_path = str(ydir / f"{r.paper_id}.pdf")
+        local_meta_path = str(ydir / f"{r.paper_id}.json")
+        rows.append(
+            {
+                "source": src,
+                "paper_id": getattr(r, "paper_id", ""),
+                "title": getattr(r, "title", ""),
+                "authors": "; ".join([str(a) for a in (getattr(r, "authors", []) or [])]),
+                "published": getattr(r, "published", ""),
+                "primary_category": getattr(r, "primary_category", ""),
+                "abs_url": getattr(r, "abs_url", ""),
+                "pdf_url": getattr(r, "pdf_url", ""),
+                "github_url": getattr(r, "github_url", ""),
+                "local_meta_path": local_meta_path,
+                "local_pdf_path": local_pdf_path,
+            }
+        )
+
+    try:
+        with open(jsonl_path, "w", encoding="utf-8") as f:
+            for row in rows:
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+    try:
+        fieldnames = [
+            "source",
+            "paper_id",
+            "title",
+            "authors",
+            "published",
+            "primary_category",
+            "abs_url",
+            "pdf_url",
+            "github_url",
+            "local_meta_path",
+            "local_pdf_path",
+        ]
+        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fieldnames)
+            w.writeheader()
+            for row in rows:
+                w.writerow({k: row.get(k, "") for k in fieldnames})
+    except OSError:
+        pass
 
 
 def _build_llm_metadata_digest(paths: List[Path], max_papers: int) -> str:
@@ -167,7 +240,11 @@ def main(argv: List[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     base_out_dir = Path(args.out).expanduser().resolve()
-    src_dirs = _ensure_source_dirs(base_out_dir)
+    collection = (args.collection or "").strip()
+    if not collection:
+        print("[WARN] --collection is empty. Please provide --collection for the outer folder name.", file=sys.stderr)
+        return 2
+    root_dir, src_dirs = _ensure_source_dirs(base_out_dir, collection)
     keywords = _parse_list(args.keyword)
     categories = _parse_list(args.category)
     hf_search_queries = _parse_list(args.hf_search)
@@ -242,7 +319,7 @@ def main(argv: List[str] | None = None) -> int:
                 hf_trending_ids=hf_ids,
             ):
                 pbar.update(1)
-                d = paper_dir(src_dirs["arxiv"], rec.paper_id)
+                d = record_dir(src_dirs["arxiv"], rec)
                 save_metadata_json(d, rec)
                 arxiv_records.append(rec)
 
@@ -268,7 +345,7 @@ def main(argv: List[str] | None = None) -> int:
         pdf_total = len(arxiv_records)
         pdf_backoff = 1.0
         for rec in tqdm(arxiv_records, total=pdf_total, desc="PDF", unit="paper"):
-            d = paper_dir(src_dirs["arxiv"], rec.paper_id)
+            d = record_dir(src_dirs["arxiv"], rec)
             try:
                 download_pdf(d, rec)
                 _sleep_pdf_throttle(backoff_multiplier=pdf_backoff)
@@ -288,7 +365,7 @@ def main(argv: List[str] | None = None) -> int:
             if hf_ids:
                 for rec in fetch_arxiv_by_ids(paper_ids=sorted(hf_ids), source="hf", is_hf_trending=True):
                     pbar.update(1)
-                    d = paper_dir(src_dirs["hf"], rec.paper_id)
+                    d = record_dir(src_dirs["hf"], rec)
                     save_metadata_json(d, rec)
                     hf_records.append(rec)
                     code = "CODE" if rec.github_url else ""
@@ -298,7 +375,7 @@ def main(argv: List[str] | None = None) -> int:
             if hf_search_ids:
                 for rec in fetch_arxiv_by_ids(paper_ids=hf_search_ids, source="hf", is_hf_trending=False):
                     pbar.update(1)
-                    d = paper_dir(src_dirs["hf"], rec.paper_id)
+                    d = record_dir(src_dirs["hf"], rec)
                     save_metadata_json(d, rec)
                     hf_records.append(rec)
                     code = "CODE" if rec.github_url else ""
@@ -313,7 +390,7 @@ def main(argv: List[str] | None = None) -> int:
             hf_pdf_total = len(hf_records)
             hf_pdf_backoff = 1.0
             for rec in tqdm(hf_records, total=hf_pdf_total, desc="HF PDF", unit="paper"):
-                d = paper_dir(src_dirs["hf"], rec.paper_id)
+                d = record_dir(src_dirs["hf"], rec)
                 try:
                     download_pdf(d, rec)
                     _sleep_pdf_throttle(backoff_multiplier=hf_pdf_backoff)
@@ -340,7 +417,7 @@ def main(argv: List[str] | None = None) -> int:
                 desc="OpenReview",
                 unit="paper",
             ):
-                d = paper_dir(src_dirs["openreview"], rec.paper_id)
+                d = record_dir(src_dirs["openreview"], rec)
                 save_metadata_json(d, rec)
                 openreview_records.append(rec)
                 print(f"{rec.paper_id} {rec.title}")
@@ -375,7 +452,7 @@ def main(argv: List[str] | None = None) -> int:
             prompt = (
                 instruction.strip()
                 + "\n\n"
-                + "IMPORTANT: Analyze ONLY the local metadata below (extracted from metadata.json). Do NOT assume you read PDFs.\n\n"
+                + "IMPORTANT: Analyze ONLY the local metadata below (extracted from local paper JSON metadata files). Do NOT assume you read PDFs.\n\n"
                 + "Local metadata digest:\n\n"
                 + digest
                 + "\n\n"
@@ -391,5 +468,10 @@ def main(argv: List[str] | None = None) -> int:
         except Exception as e:
             print(f"[LLM_ERROR] {e}", file=sys.stderr)
             return 2
+
+    try:
+        _write_index_files(root_dir, arxiv_records + hf_records + openreview_records)
+    except Exception:
+        pass
 
     return 0
