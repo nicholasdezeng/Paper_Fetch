@@ -21,16 +21,32 @@ English | [中文](#中文说明) | [完整中文文档](./README_zh.md)
 python -m pip install -r requirements.txt
 ```
 
-### 2) Run (arXiv + PDF)
+### 2) Run (arXiv)
 
 ```bash
 python -m paper_fetch \
   --out ./papers \
   --arxiv-max 20 \
-  --hf-max 30 \
   --keyword '"<your keyword>"' \
   --category cs.CV \
   --category cs.LG
+```
+
+### 3) Run (HuggingFace Papers: trending)
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --hf-max 30
+```
+
+### 4) Run (HuggingFace Papers: keyword search)
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --hf-search '<your query>' \
+  --hf-search-max 30
 ```
 
 Optional LLM analysis (disabled by default):
@@ -66,6 +82,7 @@ Outputs:
 - `./papers/<YYYY-MM-DD>/_arXiv/<paper_title>/metadata.json`
 - `./papers/<YYYY-MM-DD>/_arXiv/<paper_title>/<paper_id> - <title>.pdf` (arXiv only)
 - `./papers/<YYYY-MM-DD>/_Huggingface/trending_arxiv_ids.txt`
+- `./papers/<YYYY-MM-DD>/_Huggingface/search_arxiv_ids.txt`
 - `./papers/<YYYY-MM-DD>/_Huggingface/<paper_id>/metadata.json`
 - `./papers/<YYYY-MM-DD>/_Huggingface/<paper_id>/<paper_id> - <title>.pdf` (when PDF download is enabled)
 - `./papers/<YYYY-MM-DD>/_OpenReview/<paper_title>/metadata.json`
@@ -82,7 +99,7 @@ Folder naming:
 - Under that folder, outputs are separated by source: `_arXiv`, `_Huggingface`, `_OpenReview`.
 - Each paper is stored under a folder based on its **title**. If there is a collision, the folder name will be suffixed with the paper id.
 
-### 3) Run (OpenReview)
+### 5) Run (OpenReview)
 
 You need an OpenReview `invitation` id.
 
@@ -260,8 +277,35 @@ python -m paper_fetch --help
   - Used only for HOT marking for arXiv IDs.
   - Default: `0`.
 
+HuggingFace modes:
+
+- Trending mode (download daily trending list and save those papers under `_Huggingface`):
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --hf-max 30
+```
+
+- Keyword search mode (search HuggingFace Papers and save matched papers under `_Huggingface`):
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --hf-search '<your query>' \
+  --hf-search-max 30
+```
+
 - `--no-hf-trending`
   - Disable HuggingFace HOT marking.
+
+- `--hf-search`
+  - HuggingFace Papers search query string.
+  - Can be repeated.
+
+- `--hf-search-max`
+  - Number of HuggingFace search results to fetch.
+  - Default: `0`.
 
 ### PDF
 

@@ -13,7 +13,7 @@ import requests
 from tqdm import tqdm
 
 from .arxiv_client import fetch_arxiv_by_ids, search_arxiv
-from .hf_trending import fetch_hf_trending_arxiv_ids
+from .hf_trending import fetch_hf_search_arxiv_ids, fetch_hf_trending_arxiv_ids
 from .llm_client import LLMConfigError, chat_completion, load_llm_config
 from .openreview_client import fetch_openreview_notes, notes_to_records
 from .report import render_basic_report, write_report
@@ -42,6 +42,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--arxiv-max", type=int, default=0, help="number of arXiv papers to fetch")
     p.add_argument("--hf-max", type=int, default=0, help="number of HuggingFace daily papers ids to fetch (for HOT marking)")
+    p.add_argument(
+        "--hf-search",
+        action="append",
+        default=[],
+        help="HuggingFace Papers search query string (can be repeated)",
+    )
+    p.add_argument("--hf-search-max", type=int, default=0, help="number of HuggingFace search results to fetch")
     p.add_argument("--openreview-max", type=int, default=0, help="number of OpenReview notes to fetch")
     p.add_argument("--openreview-invitation", default="", help="OpenReview invitation id, e.g. <venue>/-/Submission")
 
@@ -163,6 +170,7 @@ def main(argv: List[str] | None = None) -> int:
     src_dirs = _ensure_source_dirs(base_out_dir)
     keywords = _parse_list(args.keyword)
     categories = _parse_list(args.category)
+    hf_search_queries = _parse_list(args.hf_search)
 
     if int(args.arxiv_max) > 0 and not keywords and not categories and not args.allow_empty_arxiv_query:
         print(
@@ -172,12 +180,35 @@ def main(argv: List[str] | None = None) -> int:
         return 2
 
     hf_ids = set()
+    hf_search_ids: List[str] = []
+
     if (int(args.hf_max) > 0) and (not args.no_hf_trending):
         try:
             hf_ids = fetch_hf_trending_arxiv_ids(max_items=args.hf_max)
         except Exception as e:
             print(f"[HUGGINGFACE_ERROR] {e}", file=sys.stderr)
             hf_ids = set()
+
+    hf_search_max = max(0, int(args.hf_search_max))
+    if hf_search_max > 0 and hf_search_queries:
+        remaining = hf_search_max
+        for q in hf_search_queries:
+            if remaining <= 0:
+                break
+            try:
+                batch = fetch_hf_search_arxiv_ids(query=q, max_items=remaining)
+            except Exception as e:
+                print(f"[HUGGINGFACE_SEARCH_ERROR] {e}", file=sys.stderr)
+                batch = []
+            for pid in batch:
+                if pid in hf_ids:
+                    continue
+                if pid in hf_search_ids:
+                    continue
+                hf_search_ids.append(pid)
+                remaining -= 1
+                if remaining <= 0:
+                    break
 
     try:
         (src_dirs["hf"] / "trending_arxiv_ids.txt").write_text(
@@ -186,6 +217,15 @@ def main(argv: List[str] | None = None) -> int:
         )
     except OSError:
         pass
+
+    if hf_search_ids:
+        try:
+            (src_dirs["hf"] / "search_arxiv_ids.txt").write_text(
+                "\n".join(hf_search_ids),
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
 
     arxiv_records = []
     hf_records = []
@@ -241,22 +281,32 @@ def main(argv: List[str] | None = None) -> int:
         pdf_elapsed = max(0.0, time.time() - pdf_start)
         print(f"[INFO] PDF download done: {pdf_total} elapsed={pdf_elapsed:0.1f}s", file=sys.stderr)
 
-    if int(args.hf_max) > 0:
-        hf_total = len(hf_ids)
+    hf_total = len(hf_ids) + len(hf_search_ids)
+    if hf_total > 0:
         hf_meta_start = time.time()
-        with tqdm(total=hf_total, desc="HF meta", unit="paper", disable=(hf_total == 0)) as pbar:
-            for rec in fetch_arxiv_by_ids(paper_ids=sorted(hf_ids), source="hf", is_hf_trending=True):
-                pbar.update(1)
-                d = paper_dir(src_dirs["hf"], rec.paper_id)
-                save_metadata_json(d, rec)
-                hf_records.append(rec)
-                code = "CODE" if rec.github_url else ""
-                tail = f" [{code}]" if code else ""
-                print(f"{rec.paper_id}{tail} {rec.title}")
+        with tqdm(total=hf_total, desc="HF meta", unit="paper") as pbar:
+            if hf_ids:
+                for rec in fetch_arxiv_by_ids(paper_ids=sorted(hf_ids), source="hf", is_hf_trending=True):
+                    pbar.update(1)
+                    d = paper_dir(src_dirs["hf"], rec.paper_id)
+                    save_metadata_json(d, rec)
+                    hf_records.append(rec)
+                    code = "CODE" if rec.github_url else ""
+                    tail = f" [{code}]" if code else ""
+                    print(f"{rec.paper_id}{tail} {rec.title}")
 
-        if hf_total > 0:
-            hf_meta_elapsed = max(0.0, time.time() - hf_meta_start)
-            print(f"[INFO] HF metadata done: {len(hf_records)}/{hf_total} elapsed={hf_meta_elapsed:0.1f}s", file=sys.stderr)
+            if hf_search_ids:
+                for rec in fetch_arxiv_by_ids(paper_ids=hf_search_ids, source="hf", is_hf_trending=False):
+                    pbar.update(1)
+                    d = paper_dir(src_dirs["hf"], rec.paper_id)
+                    save_metadata_json(d, rec)
+                    hf_records.append(rec)
+                    code = "CODE" if rec.github_url else ""
+                    tail = f" [{code}]" if code else ""
+                    print(f"{rec.paper_id}{tail} {rec.title}")
+
+        hf_meta_elapsed = max(0.0, time.time() - hf_meta_start)
+        print(f"[INFO] HF metadata done: {len(hf_records)}/{hf_total} elapsed={hf_meta_elapsed:0.1f}s", file=sys.stderr)
 
         if hf_records and (not args.no_pdf):
             hf_pdf_start = time.time()

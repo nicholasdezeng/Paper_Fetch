@@ -22,16 +22,32 @@
 python -m pip install -r requirements.txt
 ```
 
-### 2）一键抓取（arXiv + 保存 JSON + 可选下载 PDF）
+### 2）抓取 arXiv
 
 ```bash
 python -m paper_fetch \
   --out ./papers \
   --arxiv-max 20 \
-  --hf-max 30 \
   --keyword '"<你的关键词>"' \
   --category cs.CV \
   --category cs.LG
+```
+
+### 3）抓取 HuggingFace Papers（Trending）
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --hf-max 30
+```
+
+### 4）抓取 HuggingFace Papers（关键词搜索）
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --hf-search '<你的查询>' \
+  --hf-search-max 30
 ```
 
 输出目录结构（每次运行会自动创建当天日期文件夹）：
@@ -39,6 +55,7 @@ python -m paper_fetch \
 - `./papers/<YYYY-MM-DD>/_arXiv/<论文标题>/metadata.json`
 - `./papers/<YYYY-MM-DD>/_arXiv/<论文标题>/<paper_id> - <title>.pdf`（仅 arXiv，且未开启 `--no-pdf` 时才会下载）
 - `./papers/<YYYY-MM-DD>/_Huggingface/trending_arxiv_ids.txt`
+- `./papers/<YYYY-MM-DD>/_Huggingface/search_arxiv_ids.txt`
 - `./papers/<YYYY-MM-DD>/_Huggingface/<paper_id>/metadata.json`
 - `./papers/<YYYY-MM-DD>/_Huggingface/<paper_id>/<paper_id> - <title>.pdf`（未开启 `--no-pdf` 时才会下载）
 - `./papers/<YYYY-MM-DD>/_OpenReview/<论文标题>/metadata.json`
@@ -48,7 +65,7 @@ python -m paper_fetch \
 - 按数据源分目录：`_arXiv` / `_Huggingface` / `_OpenReview`
 - 每篇论文用“论文标题”创建子目录；若出现重名冲突，会自动在目录名后追加论文 id
 
-### 3）OpenReview 抓取
+### 5）OpenReview 抓取
 
 OpenReview 是“按会议/期刊 invitation”抓取，示例：
 
@@ -78,6 +95,33 @@ python -m paper_fetch \
 说明：
 
 - 由于 OpenReview 的 PDF 链接结构不统一，本实现默认只保存 `metadata.json`，建议加 `--no-pdf`
+
+### 6）可选：启用 LLM 分析（默认不使用）
+
+默认行为：
+
+- **不加 `--enable-llm`**：只抓取/保存，不会生成 `analysis.md`
+
+启用方式：
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --arxiv-max 20 \
+  --enable-llm
+```
+
+非交互示例：
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --arxiv-max 20 \
+  --enable-llm \
+  --llm-no-interactive \
+  --llm-instruction '<你的分析指令>' \
+  --llm-max-papers 30
+```
 
 ## `--keyword` 支持哪些关键词/写法？
 
@@ -175,6 +219,33 @@ export LLM_MODEL='<你的模型 id>'
 
 - `--hf-max`
   - HuggingFace Papers 页面抓取前 N 条 arXiv id（用于 HOT 标记）
+  - 默认：`0`
+
+HuggingFace 两种模式：
+
+- Trending 模式（抓取每日 trending 列表，并将对应论文保存到 `_Huggingface`）：
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --hf-max 30
+```
+
+- 关键词搜索模式（在 HuggingFace Papers 里按关键词搜索，并将匹配论文保存到 `_Huggingface`）：
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --hf-search '<你的查询>' \
+  --hf-search-max 30
+```
+
+- `--hf-search`
+  - HuggingFace Papers 搜索查询字符串
+  - 可重复传入
+
+- `--hf-search-max`
+  - HuggingFace Papers 搜索结果抓取数量
   - 默认：`0`
 
 - `--openreview-max`
