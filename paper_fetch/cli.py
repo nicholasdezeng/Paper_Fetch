@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import random
 import sys
 import time
 from pathlib import Path
 from typing import List
 
+import requests
 from tqdm import tqdm
 
 from .arxiv_client import fetch_arxiv_by_ids, search_arxiv
@@ -16,6 +18,10 @@ from .llm_client import LLMConfigError, chat_completion, load_llm_config
 from .openreview_client import fetch_openreview_notes, notes_to_records
 from .report import render_basic_report, write_report
 from .storage import download_pdf, paper_dir, save_metadata_json
+
+def _sleep_pdf_throttle(*, backoff_multiplier: float) -> None:
+    s = random.uniform(1.5, 3.0) * max(1.0, backoff_multiplier)
+    time.sleep(s)
 
 
 def _parse_list(values: List[str]) -> List[str]:
@@ -220,12 +226,18 @@ def main(argv: List[str] | None = None) -> int:
     if arxiv_records and (not args.no_pdf):
         pdf_start = time.time()
         pdf_total = len(arxiv_records)
+        pdf_backoff = 1.0
         for rec in tqdm(arxiv_records, total=pdf_total, desc="PDF", unit="paper"):
             d = paper_dir(src_dirs["arxiv"], rec.paper_id)
             try:
                 download_pdf(d, rec)
+                _sleep_pdf_throttle(backoff_multiplier=pdf_backoff)
             except Exception as e:
+                if isinstance(e, requests.exceptions.HTTPError) and e.response is not None:
+                    if int(e.response.status_code) in (429, 503):
+                        pdf_backoff *= 2
                 print(f"{rec.paper_id} [PDF_ERROR] {e}")
+                _sleep_pdf_throttle(backoff_multiplier=pdf_backoff)
         pdf_elapsed = max(0.0, time.time() - pdf_start)
         print(f"[INFO] PDF download done: {pdf_total} elapsed={pdf_elapsed:0.1f}s", file=sys.stderr)
 
@@ -249,12 +261,18 @@ def main(argv: List[str] | None = None) -> int:
         if hf_records and (not args.no_pdf):
             hf_pdf_start = time.time()
             hf_pdf_total = len(hf_records)
+            hf_pdf_backoff = 1.0
             for rec in tqdm(hf_records, total=hf_pdf_total, desc="HF PDF", unit="paper"):
                 d = paper_dir(src_dirs["hf"], rec.paper_id)
                 try:
                     download_pdf(d, rec)
+                    _sleep_pdf_throttle(backoff_multiplier=hf_pdf_backoff)
                 except Exception as e:
+                    if isinstance(e, requests.exceptions.HTTPError) and e.response is not None:
+                        if int(e.response.status_code) in (429, 503):
+                            hf_pdf_backoff *= 2
                     print(f"{rec.paper_id} [HF_PDF_ERROR] {e}")
+                    _sleep_pdf_throttle(backoff_multiplier=hf_pdf_backoff)
             hf_pdf_elapsed = max(0.0, time.time() - hf_pdf_start)
             print(f"[INFO] HF PDF download done: {hf_pdf_total} elapsed={hf_pdf_elapsed:0.1f}s", file=sys.stderr)
 
