@@ -33,6 +33,11 @@ python -m paper_fetch \
   --category cs.LG
 ```
 
+参数说明：
+
+- `--keyword`：arXiv 查询片段（遵循 arXiv 查询语法，可使用 `ti:` / `abs:` 等字段前缀与布尔运算）。
+- `--category`：arXiv 分类过滤。
+
 ### 3）抓取 HuggingFace Papers（Trending）
 
 ```bash
@@ -40,6 +45,10 @@ python -m paper_fetch \
   --out ./papers \
   --hf-max 30
 ```
+
+参数说明：
+
+- `--hf-max`：抓取 HuggingFace Papers 的每日 trending 列表，并将对应论文保存到 `_Huggingface`。
 
 ### 4）抓取 HuggingFace Papers（关键词搜索）
 
@@ -49,6 +58,11 @@ python -m paper_fetch \
   --hf-search '<你的查询>' \
   --hf-search-max 30
 ```
+
+参数说明：
+
+- `--hf-search`：HuggingFace Papers 的搜索查询（用于 https://huggingface.co/papers?q=... 的纯文本查询；不是 arXiv 查询语法）。
+- `--hf-search-max`：HuggingFace Papers 搜索结果抓取总数上限。
 
 输出目录结构（每次运行会自动创建当天日期文件夹）：
 

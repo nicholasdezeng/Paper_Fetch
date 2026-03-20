@@ -32,6 +32,11 @@ python -m paper_fetch \
   --category cs.LG
 ```
 
+Parameters:
+
+- `--keyword`: arXiv query snippet (arXiv query syntax; can use field prefixes like `ti:` / `abs:` and boolean operators).
+- `--category`: arXiv category filter.
+
 ### 3) Run (HuggingFace Papers: trending)
 
 ```bash
@@ -39,6 +44,10 @@ python -m paper_fetch \
   --out ./papers \
   --hf-max 30
 ```
+
+Parameters:
+
+- `--hf-max`: fetch the daily HuggingFace Papers trending list and save those papers under `_Huggingface`.
 
 ### 4) Run (HuggingFace Papers: keyword search)
 
@@ -48,6 +57,11 @@ python -m paper_fetch \
   --hf-search '<your query>' \
   --hf-search-max 30
 ```
+
+Parameters:
+
+- `--hf-search`: HuggingFace Papers search query (plain text query for https://huggingface.co/papers?q=...; not arXiv query syntax).
+- `--hf-search-max`: how many HuggingFace search results to fetch in total.
 
 Optional LLM analysis (disabled by default):
 
@@ -302,6 +316,11 @@ python -m paper_fetch \
 - `--hf-search`
   - HuggingFace Papers search query string.
   - Can be repeated.
+
+  Notes:
+
+  - This is a plain search query for HuggingFace Papers (the `/papers?q=...` page).
+  - This is different from arXiv `--keyword` which follows arXiv query syntax.
 
 - `--hf-search-max`
   - Number of HuggingFace search results to fetch.
