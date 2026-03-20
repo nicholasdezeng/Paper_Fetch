@@ -6,6 +6,8 @@ A minimal paper fetching & saving tool for:
 - OpenReview notes fetching by invitation (conference/journal configurable)
 - Optional LLM analysis (OpenAI-compatible API)
 
+English | [中文](#中文说明) | [完整中文文档](./README_zh.md)
+
 ## Quick Start
 
 ### 1) Install
@@ -21,7 +23,7 @@ python -m paper_fetch \
   --out ./papers \
   --arxiv-max 20 \
   --hf-max 30 \
-  --keyword '"Diffusion"' \
+  --keyword '"<your keyword>"' \
   --category cs.CV \
   --category cs.LG
 ```
@@ -50,7 +52,7 @@ python -m paper_fetch \
   --arxiv-max 20 \
   --enable-llm \
   --llm-no-interactive \
-  --llm-instruction 'Summarize key themes and give top-5 papers with reasons.' \
+  --llm-instruction '<your instruction>' \
   --llm-max-papers 30
 ```
 
@@ -83,7 +85,7 @@ Example:
 python -m paper_fetch \
   --out ./papers \
   --openreview-max 200 \
-  --openreview-invitation 'ICLR.cc/2025/Conference/-/Submission' \
+  --openreview-invitation '<OpenReview invitation id>' \
   --no-pdf
 ```
 
@@ -98,10 +100,16 @@ Set environment variables:
 ```bash
 export LLM_BASE_URL='https://api.openai.com/v1'
 export LLM_API_KEY='YOUR_API_KEY'
-export LLM_MODEL='gpt-4o-mini'
+export LLM_MODEL='<your model id>'
 ```
 
 The report will be written to `./analysis.md` with an extra `LLM Analysis` section.
+
+Supported / usable models:
+
+- This project sends `LLM_MODEL` directly to the OpenAI-compatible provider specified by `LLM_BASE_URL`.
+- Therefore, any chat/completions model that your provider exposes can be used.
+- Examples (provider-dependent): `gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`.
 
 ## What papers / topics can this project fetch?
 
@@ -121,32 +129,28 @@ Practical guidance:
   - searching in title/abstract only: `ti:` / `abs:`
   - using multiple synonyms as separate `--keyword` values (they are OR'ed)
 
-Examples (AI topics):
+Examples (query templates; not a full command):
 
-```bash
-# LLM / VLM
+```text
+# simple phrase
+--keyword '"<your phrase>"'
+
+# field-specific query: ti=title abs=abstract au=author all=all fields
+--keyword 'ti:"<term>"'
+--keyword 'abs:"<term>"'
+--keyword 'au:"<name>"'
+
+# boolean composition
+--keyword '(ti:"<term1>" AND abs:"<term2>")'
+```
+
+Keyword examples (concrete examples; not a full command):
+
+```text
 --keyword '"large language model"'
---keyword 'ti:"LLM"'
---keyword 'abs:"vision-language"'
-
-# RL
---keyword '"reinforcement learning"'
---keyword 'ti:"policy gradient"'
-
-# Flow Matching / Mean Flow / ODE / SDE
---keyword '"flow matching"'
---keyword '"mean flow"'
---keyword '"probability flow ODE"'
---keyword '"score-based"'
-
-# Diffusion
---keyword '"diffusion model"'
 --keyword 'ti:"diffusion"'
-
-# Multimodal / agents
---keyword '"multimodal"'
---keyword '"tool use"'
---keyword '"agent"'
+--keyword 'abs:"reinforcement learning"'
+--keyword '(ti:"transformer" AND abs:"efficient")'
 ```
 
 Recommended arXiv categories for AI (you can combine multiple):
@@ -192,18 +196,17 @@ python -m paper_fetch --help
   - arXiv query snippet (passed into the arXiv query string).
   - Supports field prefixes (e.g. `ti:`, `abs:`, `au:`, `all:`) and boolean operators.
   - Can be repeated.
-  - Example:
 
     ```bash
-    --keyword '"Diffusion"' --keyword '"Shadow Removal"'
+    --keyword '"<phrase 1>"' --keyword '"<phrase 2>"'
     ```
 
     ```bash
-    --keyword 'ti:"diffusion"' --keyword 'abs:"shadow removal"'
+    --keyword 'ti:"<term>"' --keyword 'abs:"<term>"'
     ```
 
     ```bash
-    --keyword '(ti:"diffusion" AND abs:"segmentation")'
+    --keyword '(ti:"<term1>" AND abs:"<term2>")'
     ```
 
   - How this tool combines inputs:
@@ -277,6 +280,75 @@ Environment variables (OpenAI-compatible):
 
 - `LLM_MODEL`
   - Default: `gpt-4o-mini`
+
+## 中文说明
+
+本项目是一个轻量的论文抓取与本地保存工具，支持：
+
+- arXiv：按关键词/分类检索并保存 `metadata.json`，可选下载 PDF
+- HuggingFace Papers：抓取每日热门 arXiv id，用于 HOT 标记
+- OpenReview：按 `invitation` 抓取指定 venue 的 notes 元数据
+- 可选 LLM 分析：兼容 OpenAI 接口风格（默认不启用），可生成 `analysis.md`
+
+快速开始（可复制模板，避免特定任务）：
+
+```bash
+python -m pip install -r requirements.txt
+
+python -m paper_fetch \
+  --out ./papers \
+  --arxiv-max 20 \
+  --keyword '"<你的关键词>"' \
+  --category <arXiv 分类>
+```
+
+OpenReview 抓取（模板）：
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --openreview-max 200 \
+  --openreview-invitation '<OpenReview invitation id>' \
+  --no-pdf
+```
+
+更多中文说明请见：[`README_zh.md`](./README_zh.md)
+
+### `--keyword` 示例（仅示例，不是一键命令）
+
+查询模板：
+
+```text
+--keyword '"<短语>"'
+--keyword 'ti:"<词>"'
+--keyword 'abs:"<词>"'
+--keyword '(ti:"<词1>" AND abs:"<词2>")'
+```
+
+具体示例：
+
+```text
+--keyword '"large language model"'
+--keyword 'ti:"diffusion"'
+--keyword 'abs:"reinforcement learning"'
+--keyword '(ti:"transformer" AND abs:"efficient")'
+```
+
+### LLM 配置说明（可复制模板里不出现模型名）
+
+环境变量（模板）：
+
+```bash
+export LLM_BASE_URL='https://api.openai.com/v1'
+export LLM_API_KEY='YOUR_API_KEY'
+export LLM_MODEL='<你的模型 id>'
+```
+
+支持/可用的模型：
+
+- 本项目会把 `LLM_MODEL` 原样传给 `LLM_BASE_URL` 对应的 OpenAI 兼容接口。
+- 因此你可以使用你的服务端实际提供的任意模型 id。
+- 示例（取决于服务端/平台）：`gpt-4o-mini`、`gpt-4o`、`gpt-4.1-mini`。
 
 ## Notes
 
