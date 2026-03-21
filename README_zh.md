@@ -77,6 +77,15 @@ AI 领域常用 `--category`（可多选）：
 - 多个 `--category` 会按 `(cat1 OR cat2 OR ...)` 合并
 - 最终查询为：`(keywords_part) AND (categories_part)`
 
+Tips（AND 查询）：
+
+- 多个 `--keyword` 参数之间默认是 OR。
+- 如果你希望“同时包含多个关键词”（AND），请把 AND 表达式写在同一个 `--keyword` 里，例如：
+
+```bash
+--keyword '(all:"image restoration" AND all:"diffusion")'
+```
+
 最多支持几个？
 
 - 本工具本身没有写死上限（参数使用 `action="append"`，可重复传入）。

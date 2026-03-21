@@ -76,6 +76,15 @@ Multiple `--keyword` / `--category`:
 - All `--category` values are OR'ed: `(cat1 OR cat2 OR ...)`
 - Final query is: `(keywords_part) AND (categories_part)`
 
+Tip (AND search):
+
+- Multiple `--keyword` flags are OR'ed.
+- To require multiple terms at the same time, put an explicit `AND` expression into a single `--keyword`, for example:
+
+```bash
+--keyword '(all:"image restoration" AND all:"diffusion")'
+```
+
 How many can you pass?
 
 - There is no hard-coded max in this tool (they use `action="append"`).
