@@ -37,8 +37,12 @@ python -m paper_fetch \
 
 参数说明：
 
+- `--out`：输出根目录。
+- `--collection`：写入到 `--out` 下的外层目录名。
+- `--arxiv-max`：抓取 arXiv 论文数量。
 - `--keyword`：arXiv 查询片段（遵循 arXiv 查询语法，可使用 `ti:` / `abs:` 等字段前缀与布尔运算）。
 - `--category`：arXiv 分类过滤。
+- `--pdf-dir _pdf`：将所有 PDF 平铺保存到 `./papers/<collection>/_pdf/`（更适合 Zotero 的 Linked Attachments 工作流）。
 
 arXiv 字段前缀（arXiv 查询语法；本工具会原样传递给 arXiv）：
 

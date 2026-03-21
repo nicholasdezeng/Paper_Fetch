@@ -36,6 +36,9 @@ python -m paper_fetch \
 
 Parameters:
 
+- `--out`: output base directory.
+- `--collection`: outer folder name under `--out`.
+- `--arxiv-max`: number of arXiv papers to fetch.
 - `--keyword`: arXiv query snippet (arXiv query syntax; can use field prefixes like `ti:` / `abs:` and boolean operators).
 - `--category`: arXiv category filter.
 - `--pdf-dir _pdf`: write all PDFs into `./papers/<collection>/_pdf/` (flat directory), which is convenient for Zotero "Linked Attachments".
