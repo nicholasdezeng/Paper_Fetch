@@ -31,13 +31,46 @@ python -m paper_fetch \
   --arxiv-max 20 \
   --keyword '"<你的关键词>"' \
   --category cs.CV \
-  --category cs.LG
+  --category cs.LG \
+  --pdf-dir _pdf
 ```
 
 参数说明：
 
 - `--keyword`：arXiv 查询片段（遵循 arXiv 查询语法，可使用 `ti:` / `abs:` 等字段前缀与布尔运算）。
 - `--category`：arXiv 分类过滤。
+
+多个 `--keyword` / `--category` 的组合规则：
+
+- 多个 `--keyword` 会按 `(kw1 OR kw2 OR ...)` 合并
+- 多个 `--category` 会按 `(cat1 OR cat2 OR ...)` 合并
+- 最终查询为：`(keywords_part) AND (categories_part)`
+
+最多支持几个？
+
+- 本工具本身没有写死上限（参数使用 `action="append"`，可重复传入）。
+- 实际上限主要来自：命令行长度限制（shell/操作系统）以及 arXiv 查询字符串过长导致的失败/效果变差。
+
+示例：
+
+```bash
+python -m paper_fetch \
+  --out ./papers \
+  --collection '<你的 collection>' \
+  --arxiv-max 20 \
+  --keyword 'ti:"diffusion"' \
+  --keyword 'abs:"flow matching"' \
+  --category cs.CV \
+  --category cs.LG \
+  --pdf-dir _pdf
+```
+
+Zotero 7 本地阅读/管理（推荐的最稳流程：Linked Attachments）：
+
+- 先在 Zotero 设置 `设置 -> 高级 -> 文件和文件夹 -> 链接附件的基本目录（Linked Attachment Base Directory）` 为 `./papers` 这样的父目录（建议设更上层而不是只设 `_pdf`）。
+- 在 Finder 打开 `./papers/<collection>/_pdf/`，全选 PDF 拖进 Zotero。
+- 弹窗选择 `Link to File`（链接到文件），不要选择复制到 Zotero 存储。
+- 需要自动元数据时：选中这些 PDF，右键 `Retrieve Metadata for PDF`。
 
 ### 3）抓取 HuggingFace Papers（Trending）
 
@@ -91,6 +124,10 @@ python -m paper_fetch \
 - `./papers/<collection>/_Huggingface/<YYYY>/<paper_id>.pdf`（未开启 `--no-pdf` 时才会下载）
 
 - `./papers/<collection>/_OpenReview/<YYYY>/<paper_id>.json`
+
+当使用 `--pdf-dir _pdf` 时，所有 PDF 会平铺保存到：
+
+- `./papers/<collection>/_pdf/<paper_id>.pdf`
 
 目录命名说明：
 
@@ -159,151 +196,12 @@ python -m paper_fetch \
   --llm-max-papers 30
 ```
 
-## `--keyword` 支持哪些关键词/写法？
+## 更多参数
 
-结论：
-
-- `--keyword` 是 **arXiv 的查询语句片段**。
-- 语法上你可以输入各种关键词（如 `LLM` / `RL` / `flow matching` / 冷门主题）。
-- 但是否能抓到取决于 arXiv 是否有匹配结果：若返回 0 条，本工具会停止并警告（不会强行抓取）。
-
-常用写法示例：
-
-```text
-# 直接短语
---keyword '"large language model"'
-
-# 指定字段：ti=标题 abs=摘要 au=作者
---keyword 'ti:"transformer"'
---keyword 'abs:"reinforcement learning"'
---keyword 'au:"Yann LeCun"'
-
-# 布尔组合
---keyword '(ti:"transformer" AND abs:"efficient")'
-```
-
-本工具的拼接规则：
-
-- 多个 `--keyword` 会按 `(kw1 OR kw2 OR ...)` 合并
-- 多个 `--category` 会按 `(cat1 OR cat2 OR ...)` 合并
-- 最终查询为：`(keywords_part) AND (categories_part)`
-
-推荐 AI 方向常用分类（可多选）：
-
-- `cs.LG`（机器学习）
-- `cs.AI`（人工智能）
-- `cs.CV`（计算机视觉）
-- `cs.CL`（自然语言处理）
-- `cs.RO`（机器人）
-- `stat.ML`（统计机器学习）
-
-## 可选：启用 LLM 分析（默认不使用）
-
-默认行为：
-
-- **不加 `--enable-llm`**：只抓取/保存，不会生成 `analysis.md`
-
-启用方式：
+请运行：
 
 ```bash
-python -m paper_fetch \
-  --out ./papers \
-  --arxiv-max 20 \
-  --enable-llm
+python -m paper_fetch --help
 ```
 
-LLM 分析说明（省 token 的关键点）：
-
-- LLM 只分析本地落盘的论文元数据 JSON（标题/作者/摘要等），**不会读取 PDF**
-- LLM 会在抓取完成并保存到本地后再执行分析
-- 你可以在终端交互输入“如何分析”（多行输入，空行结束）；也可以用参数非交互指定
-
-非交互示例：
-
-```bash
-python -m paper_fetch \
-  --out ./papers \
-  --arxiv-max 20 \
-  --enable-llm \
-  --llm-no-interactive \
-  --llm-instruction '<你的分析指令>' \
-  --llm-max-papers 30
-```
-
-配置环境变量（OpenAI 接口兼容）：
-
-```bash
-export LLM_BASE_URL='https://api.openai.com/v1'
-export LLM_API_KEY='YOUR_API_KEY'
-export LLM_MODEL='<你的模型 id>'
-```
-
-支持/可用的模型：
-
-- 本项目会把 `LLM_MODEL` 原样传给 `LLM_BASE_URL` 对应的 OpenAI 兼容接口。
-- 因此你可以使用你的服务端实际提供的任意模型 id。
-- 示例（取决于服务端/平台）：`gpt-4o-mini`、`gpt-4o`、`gpt-4.1-mini`。
-
-## 常用参数速查
-
-- `--out`
-  - 输出根目录
-
-- `--arxiv-max`
-  - arXiv 抓取数量
-  - 默认：`0`
-
-- `--hf-max`
-  - HuggingFace Papers 页面抓取前 N 条 arXiv id（用于 HOT 标记）
-  - 默认：`0`
-
-HuggingFace 两种模式：
-
-- Trending 模式（抓取每日 trending 列表，并将对应论文保存到 `_Huggingface`）：
-
-```bash
-python -m paper_fetch \
-  --out ./papers \
-  --hf-max 30
-```
-
-- 关键词搜索模式（在 HuggingFace Papers 里按关键词搜索，并将匹配论文保存到 `_Huggingface`）：
-
-```bash
-python -m paper_fetch \
-  --out ./papers \
-  --hf-search '<你的查询>' \
-  --hf-search-max 30
-```
-
-- `--hf-search`
-  - HuggingFace Papers 搜索查询字符串
-  - 可重复传入
-
-- `--hf-search-max`
-  - HuggingFace Papers 搜索结果抓取数量
-  - 默认：`0`
-
-- `--openreview-max`
-  - OpenReview 抓取数量（默认 0，不抓取）
-
-- `--openreview-invitation`
-  - OpenReview invitation（决定抓哪个会议/期刊/轨道）
-
-- `--no-pdf`
-  - 不下载 PDF，仅保存元数据（每篇论文对应一个 `<paper_id>.json`）
-
-- `--enable-llm`
-  - 启用 LLM 分析并生成 `analysis.md`
-
-- `--analysis-out`
-  - 分析报告输出路径（默认 `analysis.md`）
-
-- `--llm-instruction`
-  - LLM 分析指令文本（为空则终端交互输入）
-
-- `--llm-no-interactive`
-  - 禁止交互输入（为空则使用默认指令）
-
-- `--llm-max-papers`
-  - 限制写入 LLM prompt 的论文条目数量，用于控制 token
+提示：复杂 `--keyword`（含括号/引号）建议用单引号包起来，避免 shell 解析出错。

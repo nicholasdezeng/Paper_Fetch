@@ -55,6 +55,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--no-hf-trending", action="store_true", help="disable HuggingFace trending marking")
     p.add_argument("--no-pdf", action="store_true", help="do not download PDFs (save metadata only)")
+    p.add_argument(
+        "--pdf-dir",
+        default="",
+        help="override PDF output directory. If relative, it is under --out/--collection. Example: --pdf-dir _pdf",
+    )
 
     p.add_argument(
         "--allow-empty-arxiv-query",
@@ -122,7 +127,7 @@ def _iter_metadata_json_files(root: Path) -> List[Path]:
     return out
 
 
-def _write_index_files(root: Path, records: list[object]) -> None:
+def _write_index_files(root: Path, records: list[object], pdf_dir: Path | None = None) -> None:
     jsonl_path = root / "index.jsonl"
     csv_path = root / "index.csv"
 
@@ -143,7 +148,10 @@ def _write_index_files(root: Path, records: list[object]) -> None:
             base = root / f"_{src}"
 
         ydir = record_dir(base, r)
-        local_pdf_path = str(ydir / f"{r.paper_id}.pdf")
+        if pdf_dir is not None:
+            local_pdf_path = str(pdf_dir / f"{r.paper_id}.pdf")
+        else:
+            local_pdf_path = str(ydir / f"{r.paper_id}.pdf")
         local_meta_path = str(ydir / f"{r.paper_id}.json")
         rows.append(
             {
@@ -245,6 +253,12 @@ def main(argv: List[str] | None = None) -> int:
         print("[WARN] --collection is empty. Please provide --collection for the outer folder name.", file=sys.stderr)
         return 2
     root_dir, src_dirs = _ensure_source_dirs(base_out_dir, collection)
+    pdf_dir: Path | None = None
+    if str(getattr(args, "pdf_dir", "") or "").strip():
+        pdf_dir = Path(str(args.pdf_dir)).expanduser()
+        if not pdf_dir.is_absolute():
+            pdf_dir = root_dir / pdf_dir
+        pdf_dir.mkdir(parents=True, exist_ok=True)
     keywords = _parse_list(args.keyword)
     categories = _parse_list(args.category)
     hf_search_queries = _parse_list(args.hf_search)
@@ -345,9 +359,10 @@ def main(argv: List[str] | None = None) -> int:
         pdf_total = len(arxiv_records)
         pdf_backoff = 1.0
         for rec in tqdm(arxiv_records, total=pdf_total, desc="PDF", unit="paper"):
-            d = record_dir(src_dirs["arxiv"], rec)
+            d = pdf_dir if pdf_dir is not None else record_dir(src_dirs["arxiv"], rec)
             try:
-                download_pdf(d, rec)
+                pdf_path = download_pdf(d, rec)
+                _ = pdf_path
                 _sleep_pdf_throttle(backoff_multiplier=pdf_backoff)
             except Exception as e:
                 if isinstance(e, requests.exceptions.HTTPError) and e.response is not None:
@@ -390,9 +405,10 @@ def main(argv: List[str] | None = None) -> int:
             hf_pdf_total = len(hf_records)
             hf_pdf_backoff = 1.0
             for rec in tqdm(hf_records, total=hf_pdf_total, desc="HF PDF", unit="paper"):
-                d = record_dir(src_dirs["hf"], rec)
+                d = pdf_dir if pdf_dir is not None else record_dir(src_dirs["hf"], rec)
                 try:
-                    download_pdf(d, rec)
+                    pdf_path = download_pdf(d, rec)
+                    _ = pdf_path
                     _sleep_pdf_throttle(backoff_multiplier=hf_pdf_backoff)
                 except Exception as e:
                     if isinstance(e, requests.exceptions.HTTPError) and e.response is not None:
@@ -470,7 +486,7 @@ def main(argv: List[str] | None = None) -> int:
             return 2
 
     try:
-        _write_index_files(root_dir, arxiv_records + hf_records + openreview_records)
+        _write_index_files(root_dir, arxiv_records + hf_records + openreview_records, pdf_dir=pdf_dir)
     except Exception:
         pass
 
