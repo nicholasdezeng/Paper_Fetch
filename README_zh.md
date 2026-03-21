@@ -40,6 +40,33 @@ python -m paper_fetch \
 - `--keyword`：arXiv 查询片段（遵循 arXiv 查询语法，可使用 `ti:` / `abs:` 等字段前缀与布尔运算）。
 - `--category`：arXiv 分类过滤。
 
+arXiv 字段前缀（arXiv 查询语法；本工具会原样传递给 arXiv）：
+
+- `ti:` 标题（title）
+- `abs:` 摘要（abstract）
+- `au:` 作者（author）
+- `co:` 备注/评论（comment）
+- `jr:` 期刊引用（journal reference）
+- `cat:` 学科分类（subject category）
+- `rn:` 报告编号（report number）
+- `id:` arXiv 标识符（arXiv identifier）
+- `all:` 所有字段（all fields）
+
+AI 领域常用 `--category`（可多选）：
+
+- `cs.AI`：Artificial Intelligence
+- `cs.CL`：Computation and Language
+- `cs.CV`：Computer Vision and Pattern Recognition
+- `cs.GR`：Computer Graphics
+- `cs.LG`：Machine Learning
+- `cs.MA`：Multiagent Systems
+- `cs.NE`：Neural and Evolutionary Computing
+- `cs.RO`：Robotics
+- `eess.AS`：Audio and Speech Processing
+- `eess.IV`：Image and Video Processing
+- `eess.SP`：Signal Processing
+- `stat.ML`：Machine Learning
+
 多个 `--keyword` / `--category` 的组合规则：
 
 - 多个 `--keyword` 会按 `(kw1 OR kw2 OR ...)` 合并

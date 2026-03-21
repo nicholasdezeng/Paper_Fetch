@@ -40,6 +40,33 @@ Parameters:
 - `--category`: arXiv category filter.
 - `--pdf-dir _pdf`: write all PDFs into `./papers/<collection>/_pdf/` (flat directory), which is convenient for Zotero "Linked Attachments".
 
+arXiv field prefixes (arXiv query syntax; this tool passes them through):
+
+- `ti:` title
+- `abs:` abstract
+- `au:` author
+- `co:` comment
+- `jr:` journal reference
+- `cat:` subject category
+- `rn:` report number
+- `id:` id (arXiv identifier)
+- `all:` all fields
+
+Common AI categories for `--category`:
+
+- `cs.AI`: Artificial Intelligence
+- `cs.CL`: Computation and Language
+- `cs.CV`: Computer Vision and Pattern Recognition
+- `cs.GR`: Computer Graphics
+- `cs.LG`: Machine Learning
+- `cs.MA`: Multiagent Systems
+- `cs.NE`: Neural and Evolutionary Computing
+- `cs.RO`: Robotics
+- `eess.AS`: Audio and Speech Processing
+- `eess.IV`: Image and Video Processing
+- `eess.SP`: Signal Processing
+- `stat.ML`: Machine Learning
+
 Multiple `--keyword` / `--category`:
 
 - All `--keyword` values are OR'ed: `(kw1 OR kw2 OR ...)`
